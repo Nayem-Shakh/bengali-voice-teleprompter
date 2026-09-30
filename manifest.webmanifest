@@ -1,0 +1,9 @@
+{
+  "name": "VoiceFlow Teleprompter — Bengali",
+  "short_name": "VoiceFlow",
+  "start_url": "./",
+  "display": "fullscreen",
+  "background_color": "#111318",
+  "theme_color": "#111318",
+  "description": "Bengali-capable voice-following teleprompter for Android."
+}

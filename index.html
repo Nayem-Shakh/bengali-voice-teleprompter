@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#111318">
+<meta name="description" content="Voice-following teleprompter with Bengali speech support.">
+<link rel="manifest" href="manifest.webmanifest">
+<title>VoiceFlow Teleprompter — Bengali</title>
+<style>
+:root{--bg:#111318;--panel:#1a1d24;--panel2:#232731;--text:#f5f7fa;--muted:#9da5b4;--accent:#56d364;--warn:#f2cc60;--danger:#ff7b72;--line:#343945;--font:48px;--lh:1.42;--eyeline:42vh}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Noto Sans Bengali","Noto Sans",sans-serif}
+body{overflow:hidden}.app{height:100%;display:flex;flex-direction:column}.toolbar{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#0c0e12;border-bottom:1px solid var(--line);z-index:20;flex-wrap:wrap}.toolbar button,.toolbar select,.toolbar input{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:9px;min-height:40px;padding:7px 10px;font:inherit}.toolbar button{cursor:pointer}.toolbar button.primary{border-color:var(--accent);color:var(--accent)}.toolbar button.active{background:#18351f;border-color:var(--accent)}.toolbar .status{margin-left:auto;font-size:13px;color:var(--muted);white-space:nowrap}.toolbar .status.live{color:var(--accent)}.toolbar .status.warn{color:var(--warn)}.toolbar .status.err{color:var(--danger)}
+.prompter{position:relative;flex:1;overflow:hidden;background:#000;touch-action:pan-y;transform-origin:center}.scriptViewport{height:100%;overflow-y:auto;scroll-behavior:auto;padding:calc(50vh - var(--eyeline)) 7vw 75vh;scrollbar-width:none}.scriptViewport::-webkit-scrollbar{display:none}.script{max-width:1100px;margin:0 auto;font-size:var(--font);line-height:var(--lh);font-weight:500;letter-spacing:.005em;white-space:pre-wrap;word-break:normal}.token{display:inline;cursor:pointer;border-radius:4px;padding:0 1px}.token.current{background:rgba(86,211,100,.23);box-shadow:0 0 0 1px rgba(86,211,100,.35)}.token.spoken{color:#8b949e}.hint{color:#7d8590;font-size:.72em;font-style:italic}.eyeline{position:absolute;left:0;right:0;top:var(--eyeline);height:2px;background:rgba(86,211,100,.55);pointer-events:none;z-index:5}.eyeline::after{content:"";position:absolute;right:14px;top:-9px;border:8px solid transparent;border-right-color:rgba(86,211,100,.55)}.micBadge{position:absolute;left:14px;top:14px;background:rgba(0,0,0,.65);border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted);z-index:6}.micBadge.live{color:var(--accent);border-color:rgba(86,211,100,.6)}.editor{position:absolute;inset:0;background:#101217;z-index:10;display:none;flex-direction:column}.editor.open{display:flex}.editor textarea{flex:1;width:100%;resize:none;background:#101217;color:#f5f7fa;border:0;outline:0;padding:24px;font:22px/1.6 "Noto Sans Bengali",system-ui,sans-serif}.editorbar{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line);background:#171a20}.modalHint{font-size:12px;color:var(--muted);padding:0 10px;align-self:center}.settings{position:absolute;right:10px;top:58px;width:min(360px,calc(100vw - 20px));background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;z-index:30;display:none;box-shadow:0 15px 50px #000}.settings.open{display:block}.row{display:flex;align-items:center;gap:10px;margin:10px 0}.row label{flex:1;color:var(--muted);font-size:14px}.row input[type=range]{width:160px}.row input[type=number]{width:80px}.help{font-size:12px;color:var(--muted);line-height:1.5}.toast{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);background:#242933;color:#fff;border:1px solid var(--line);padding:9px 13px;border-radius:10px;z-index:40;opacity:0;pointer-events:none;transition:opacity .15s}.toast.show{opacity:1}.countdown{position:absolute;inset:0;display:none;place-items:center;background:rgba(0,0,0,.75);z-index:50;font-size:18vw;font-weight:700}.countdown.show{display:grid}
+@media(max-width:700px){.toolbar{gap:5px;padding:6px}.toolbar button,.toolbar select{min-height:36px;padding:5px 7px;font-size:13px}.toolbar .status{width:100%;order:10;margin-left:0}.scriptViewport{padding-left:6vw;padding-right:6vw}.script{font-size:var(--font)}} 
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="toolbar">
+    <button id="editBtn">Edit</button>
+    <button id="playBtn" class="primary">▶ Follow voice</button>
+    <button id="stopBtn">■ Stop</button>
+    <select id="lang" title="Speech recognition language">
+      <option value="bn-BD">বাংলা (Bangladesh)</option>
+      <option value="bn-IN">বাংলা (India)</option>
+      <option value="en-US">English (US)</option>
+      <option value="en-GB">English (UK)</option>
+      <option value="hi-IN">हिन्दी</option>
+      <option value="ur-PK">اردو</option>
+    </select>
+    <button id="mirrorBtn">Mirror</button>
+    <button id="fsBtn">Fullscreen</button>
+    <button id="settingsBtn">⚙</button>
+    <span id="status" class="status">Ready</span>
+  </div>
+
+  <div class="prompter" id="prompter">
+    <div class="scriptViewport" id="viewport">
+      <div class="script" id="script"></div>
+    </div>
+    <div class="eyeline"></div>
+    <div id="micBadge" class="micBadge">● mic off</div>
+    <div id="countdown" class="countdown"></div>
+  </div>
+
+  <div id="editor" class="editor">
+    <textarea id="editorText" spellcheck="false"></textarea>
+    <div class="editorbar">
+      <button id="applyBtn" class="primary">Apply script</button>
+      <button id="cancelBtn">Cancel</button>
+      <span class="modalHint">Use [pause] or [look at camera] for visual hints. Hints are ignored by voice matching.</span>
+    </div>
+  </div>
+
+  <div id="settings" class="settings">
+    <div class="row"><label>Font size</label><input id="fontRange" type="range" min="24" max="100" value="48"><output id="fontOut">48</output>px</div>
+    <div class="row"><label>Line height</label><input id="lineRange" type="range" min="110" max="180" value="142"><output id="lineOut">1.42</output></div>
+    <div class="row"><label>Look-ahead words</label><input id="windowRange" type="range" min="8" max="60" value="32"><output id="windowOut">32</output></div>
+    <div class="row"><label>Mirror</label><input id="mirrorCheck" type="checkbox"></div>
+    <div class="row"><label>Auto-restart recognition</label><input id="restartCheck" type="checkbox" checked></div>
+    <div class="row"><label>Start after countdown</label><input id="countdownCheck" type="checkbox"></div>
+    <div class="help">
+      <b>Foot pedal / Bluetooth keyboard:</b> Space = start/stop, ←/→ = ±5 words, ↑/↓ = ±15 words. Most HID foot pedals work if they send keyboard keys.<br><br>
+      Voice tracking uses the browser's SpeechRecognition engine. Bengali recognition quality depends on the Android/Chrome speech service.
+    </div>
+  </div>
+  <div id="toast" class="toast"></div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const viewport=$('viewport'), scriptEl=$('script'), editor=$('editor'), editorText=$('editorText');
+  const playBtn=$('playBtn'), stopBtn=$('stopBtn'), statusEl=$('status'), micBadge=$('micBadge');
+  const langEl=$('lang'), settings=$('settings'), toast=$('toast'), countdown=$('countdown');
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let scriptText = localStorage.getItem('vf-script') || `আজকে আমরা ইংরেজি শেখার একটি গুরুত্বপূর্ণ বিষয় নিয়ে কথা বলব।
+
+আপনি যখন ক্যামেরার সামনে কথা বলছেন, তখন আপনাকে স্ক্রিপ্টের সঙ্গে তাল মিলিয়ে চলতে হবে না।
+
+এই টেলিপ্রম্পটার আপনার কথা শুনবে এবং আপনি যে শব্দগুলো বলছেন, সেই অনুযায়ী স্ক্রিপ্ট সামনে এগিয়ে নেবে।
+
+আপনি থামলে স্ক্রলও থেমে যাবে।
+
+চলুন শুরু করি।`;
+  let tokens=[], tokenEls=[], anchor=-1, running=false, recognition=null, restarting=false;
+  let lastFinalIndex=-1, interimText='', mirror=false, toastTimer=null;
+  let lookahead=32;
+
+  const norm = s => s.normalize('NFC').replace(/[\u200B-\u200D\uFEFF]/g,'')
+    .toLocaleLowerCase()
+    .replace(/[\p{P}\p{S}]+/gu,' ')
+    .replace(/\s+/g,' ').trim();
+
+  function tokenize(s){
+    const out=[]; let m;
+    // Unicode letters/numbers, including Bengali combining marks.
+    const re=/[\p{L}\p{M}\p{N}]+(?:[’'][\p{L}\p{M}\p{N}]+)*/gu;
+    while((m=re.exec(norm(s)))!==null) out.push({t:m[0], i:m.index});
+    return out;
+  }
+
+  function stripHints(s){
+    return s.replace(/\[[^\]]*\]/g,'');
+  }
+
+  function render(){
+    scriptEl.innerHTML='';
+    tokens=tokenize(stripHints(scriptText));
+    tokenEls=[];
+    // Render with hints and clickable words. Build a simple token stream preserving hints.
+    const parts=scriptText.split(/(\[[^\]]*\]|[\p{L}\p{M}\p{N}]+(?:[’'][\p{L}\p{M}\p{N}]+)*)/gu);
+    let ti=0;
+    for(const p of parts){
+      if(!p) continue;
+      if(/^\[[^\]]*\]$/.test(p)){ const span=document.createElement('span'); span.className='hint'; span.textContent=p; scriptEl.appendChild(span); continue; }
+      if(/^[\p{L}\p{M}\p{N}]+(?:[’'][\p{L}\p{M}\p{N}]+)*$/u.test(p)){
+        const span=document.createElement('span'); span.className='token'; span.textContent=p;
+        const idx=ti++; span.dataset.idx=idx;
+        span.addEventListener('click',()=>{anchor=Math.max(-1,idx-1); updateHighlight(); scrollToAnchor(true);});
+        scriptEl.appendChild(span); tokenEls.push(span);
+      } else {
+        scriptEl.appendChild(document.createTextNode(p));
+      }
+    }
+    updateHighlight();
+    localStorage.setItem('vf-script',scriptText);
+  }
+
+  function setStatus(text, cls=''){ statusEl.textContent=text; statusEl.className='status '+cls; }
+  function toastMsg(t){ toast.textContent=t; toast.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>toast.classList.remove('show'),1800); }
+
+  function updateHighlight(){
+    tokenEls.forEach((e,i)=>{e.classList.toggle('current',i===anchor); e.classList.toggle('spoken',i<anchor);});
+  }
+
+  function scrollToAnchor(instant=false){
+    const el=tokenEls[anchor]; if(!el) return;
+    const top=el.offsetTop - viewport.clientHeight*0.42;
+    if(instant) viewport.scrollTo({top,behavior:'auto'});
+    else viewport.scrollTo({top,behavior:'smooth'});
+  }
+
+  function similarity(a,b){
+    if(a===b) return 1;
+    if(!a||!b) return 0;
+    // Character edit similarity; useful for ASR minor errors.
+    const la=a.length, lb=b.length;
+    if(Math.max(la,lb)<=2) return 0;
+    let prev=Array(lb+1); for(let j=0;j<=lb;j++) prev[j]=j;
+    for(let i=1;i<=la;i++){
+      const cur=[i];
+      for(let j=1;j<=lb;j++) cur[j]=Math.min(cur[j-1]+1,prev[j]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));
+      prev=cur;
+    }
+    return 1-prev[lb]/Math.max(la,lb);
+  }
+
+  function bestMatch(spoken, start){
+    if(!spoken.length || !tokens.length) return null;
+    const end=Math.min(tokens.length,start+lookahead);
+    let best=null;
+    // Search for the first 1-4 spoken words as an anchor, then score a run.
+    const sMax=Math.min(spoken.length,8);
+    for(let j=start;j<end;j++){
+      let score=0, matched=0;
+      for(let k=0;k<sMax && j+k<end;k++){
+        const sim=similarity(spoken[k],tokens[j+k].t);
+        if(sim>=0.62 || spoken[k]===tokens[j+k].t){ score+=sim; matched++; }
+        else if(k<2) break;
+      }
+      if(matched){
+        const avg=score/matched;
+        const bonus=Math.min(matched,4)*0.07;
+        const total=avg+bonus-(j-start)*0.006;
+        if(!best || total>best.total) best={index:j,count:matched,total};
+      }
+    }
+    if(!best) return null;
+    // Require stronger evidence for one short word to avoid accidental jumps.
+    if(best.count===1 && best.total<0.94) return null;
+    return best;
+  }
+
+  function processTranscript(text){
+    const spoken=tokenize(text).map(x=>x.t);
+    if(!spoken.length) return;
+    const start=Math.max(0,anchor+1);
+    let m=bestMatch(spoken,start);
+    if(!m){
+      // Recovery: look a little behind for retakes/repeated words, but only if there is a 2+ word run.
+      const back=Math.max(0,anchor-25);
+      const oldLook=lookahead; lookahead=Math.min(100,oldLook+60);
+      m=bestMatch(spoken,back); lookahead=oldLook;
+      if(m && m.count<2 && m.index<=anchor) m=null;
+    }
+    if(m){
+      const newAnchor=Math.max(anchor,m.index+m.count-1);
+      if(newAnchor>anchor){
+        anchor=newAnchor; updateHighlight(); scrollToAnchor(false);
+      }
+    }
+  }
+
+  function makeRecognition(){
+    if(!SpeechRecognition) return null;
+    const r=new SpeechRecognition();
+    r.continuous=true; r.interimResults=true; r.maxAlternatives=1; r.lang=langEl.value;
+    r.onstart=()=>{micBadge.textContent='● listening';micBadge.classList.add('live');setStatus('Listening…','live');};
+    r.onresult=e=>{
+      // Process only the current result's transcript. For final results, process the newly emitted phrase.
+      for(let i=e.resultIndex;i<e.results.length;i++){
+        const res=e.results[i]; const txt=res[0]?.transcript||'';
+        if(res.isFinal){ processTranscript(txt); lastFinalIndex=i; }
+        else { processTranscript(txt); }
+      }
+    };
+    r.onerror=e=>{
+      if(e.error==='not-allowed'||e.error==='service-not-allowed'){running=false;setStatus('Microphone permission denied','err');micBadge.textContent='● mic blocked';micBadge.classList.remove('live');return;}
+      if(e.error==='language-not-supported'){running=false;setStatus('Language not supported by this browser','err');return;}
+      setStatus('Speech error: '+e.error,'warn');
+    };
+    r.onend=()=>{
+      micBadge.classList.remove('live'); micBadge.textContent='● mic off';
+      if(running && $('restartCheck').checked && !restarting){
+        restarting=true; setTimeout(()=>{restarting=false;if(running) try{recognition=makeRecognition();recognition.start();}catch(_){}},250);
+      } else if(!running) setStatus('Stopped');
+    };
+    return r;
+  }
+
+  async function requestWakeLock(){ if('wakeLock' in navigator){ try{ await navigator.wakeLock.request('screen'); }catch(_){} } }
+  async function start(){
+    if(!SpeechRecognition){setStatus('SpeechRecognition unavailable','err');toastMsg('Use current Chrome on Android.');return;}
+    if(running)return;
+    running=true;
+    if($('countdownCheck').checked){
+      countdown.classList.add('show');
+      for(let n=3;n>0;n--){countdown.textContent=n;await new Promise(r=>setTimeout(r,700));}
+      countdown.classList.remove('show');
+    }
+    recognition=makeRecognition();
+    try{await requestWakeLock(); recognition.start();playBtn.classList.add('active');playBtn.textContent='● Following voice';}
+    catch(e){running=false;setStatus('Could not start microphone','err');}
+  }
+  function stop(){
+    running=false; restarting=false; if(recognition){try{recognition.stop();}catch(_){}}
+    recognition=null; playBtn.classList.remove('active');playBtn.textContent='▶ Follow voice'; micBadge.classList.remove('live');micBadge.textContent='● mic off';setStatus('Stopped');
+  }
+
+  $('editBtn').onclick=()=>{stop();editorText.value=scriptText;editor.classList.add('open');};
+  $('applyBtn').onclick=()=>{scriptText=editorText.value;render();editor.classList.remove('open');toastMsg('Script saved on this device.');};
+  $('cancelBtn').onclick=()=>editor.classList.remove('open');
+  playBtn.onclick=start; stopBtn.onclick=stop;
+  langEl.onchange=()=>{localStorage.setItem('vf-lang',langEl.value);if(running){stop();start();}};
+  const savedLang=localStorage.getItem('vf-lang'); if(savedLang && [...langEl.options].some(o=>o.value===savedLang))langEl.value=savedLang;
+
+  $('mirrorBtn').onclick=()=>{mirror=!mirror;$('prompter').style.transform=mirror?'scaleX(-1)':'';toastMsg(mirror?'Mirror ON':'Mirror OFF');};
+  $('fsBtn').onclick=async()=>{try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen();else await document.exitFullscreen();}catch(_){toastMsg('Fullscreen unavailable');}};
+  $('settingsBtn').onclick=()=>settings.classList.toggle('open');
+  $('fontRange').oninput=e=>{document.documentElement.style.setProperty('--font',e.target.value+'px');$('fontOut').textContent=e.target.value;localStorage.setItem('vf-font',e.target.value)};
+  $('lineRange').oninput=e=>{document.documentElement.style.setProperty('--lh',(e.target.value/100).toFixed(2));$('lineOut').textContent=(e.target.value/100).toFixed(2)};
+  $('windowRange').oninput=e=>{lookahead=+e.target.value;$('windowOut').textContent=e.target.value};
+  $('mirrorCheck').onchange=e=>{mirror=e.target.checked;$('prompter').style.transform=mirror?'scaleX(-1)':'';};
+  const sf=localStorage.getItem('vf-font');if(sf){$('fontRange').value=sf;document.documentElement.style.setProperty('--font',sf+'px');$('fontOut').textContent=sf;}
+  document.addEventListener('keydown',e=>{
+    if(editor.classList.contains('open'))return;
+    if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName))return;
+    if(e.code==='Space'){e.preventDefault();running?stop():start();}
+    else if(e.code==='Escape'){e.preventDefault();stop();}
+    else if(e.code==='ArrowLeft'){e.preventDefault();anchor=Math.max(-1,anchor-5);updateHighlight();scrollToAnchor(true);}
+    else if(e.code==='ArrowRight'){e.preventDefault();anchor=Math.min(tokens.length-1,anchor+5);updateHighlight();scrollToAnchor(true);}
+    else if(e.code==='ArrowUp'){e.preventDefault();anchor=Math.max(-1,anchor-15);updateHighlight();scrollToAnchor(true);}
+    else if(e.code==='ArrowDown'){e.preventDefault();anchor=Math.min(tokens.length-1,anchor+15);updateHighlight();scrollToAnchor(true);}
+  });
+  let wakeLock=null;
+  document.addEventListener('visibilitychange',async()=>{if(document.visibilityState==='visible'&&running&&'wakeLock'in navigator){try{wakeLock=await navigator.wakeLock.request('screen');}catch(_){}}});
+  render();
+})();
+</script>
+</body>
+</html><script>if("serviceWorker" in navigator){navigator.serviceWorker.register("./sw.js").catch(()=>{});}</script>
